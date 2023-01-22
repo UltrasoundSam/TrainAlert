@@ -12,7 +12,9 @@ WiFiClientSecure client;
 char endpoint[52];
 char departure[5]; 
 char platform[5];
-char output_msg[64];
+char depart_station_full[12];
+char dest_station_full[12];
+char output_msg[128];
 
 // Variables to hold http response and JSON doc
 DynamicJsonDocument doc(4096);
@@ -46,7 +48,7 @@ void loop() {
   // Get useful information from json data
   parse_json(payload, platform, departure);
   
-  sprintf(output_msg, "The next train from %s to %s will leave at %s from platform %s", depart_station, dest_station, departure, platform);
+  sprintf(output_msg, "The next train from %s to %s will leave at %s from platform %s", depart_station_full, dest_station_full, departure, platform);
   Serial.println(output_msg);
 
   delay(30000);
@@ -93,7 +95,12 @@ void parse_json(String &unformatted, char* platform, char* departuretime) {
   // Get useful information from json data
   const char* plat_data = json_data["services"][0]["locationDetail"]["platform"];
   const char* depart_time = json_data["services"][0]["locationDetail"]["realtimeDeparture"];
+  const char* depart_s = json_data["location"]["name"];
+  const char* dest_s = json_data["filter"]["destination"]["name"];
+  
+  // Copy out for plotting
   strcpy(platform, plat_data);
   strcpy(departuretime, depart_time);
-
+  strcpy(depart_station_full, depart_s);
+  strcpy(dest_station_full, dest_s);
 }

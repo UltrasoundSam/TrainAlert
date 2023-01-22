@@ -35,6 +35,6 @@
 configuration_secrets.h
 
 # Get rid of a load of compile config files
-./TrainUpdate/debug*
+*TrainUpdate/debug*
 *.svd
 
