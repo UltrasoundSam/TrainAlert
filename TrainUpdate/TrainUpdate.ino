@@ -3,10 +3,16 @@
 #include <UniversalTelegramBot.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
+#include <Adafruit_ST7789.h>
+#include <SPI.h>
 #include "configuration_secrets.h"
 
-// Create wifi client
+// Create wifi client and bot to receive telegram messages
 WiFiClientSecure client;
+UniversalTelegramBot bot(SECRET_TELEGRAMTOKEN, client);
+
+// Use dedicated hardware SPI pins
+Adafruit_ST7789 tft = Adafruit_ST7789(TFT_CS, TFT_DC, TFT_RST);
 
 // Create all char arrays to hold relevant strings
 char endpoint[52];
@@ -16,9 +22,14 @@ char depart_station_full[12];
 char dest_station_full[12];
 char output_msg[128];
 
+// Define stations to depart from and arrive at.
+char depart_station[] = "SHF";
+char dest_station[] = "YRK";
+
 // Timeout values
 unsigned long previousMillis = 0;
-const long interval = 300000;
+const long interval = 2000;
+
 
 void get_apidata(String &stringpayload) {
   // Create http request
@@ -31,12 +42,8 @@ void get_apidata(String &stringpayload) {
 
   if (statusCode > 0) {
     // Able to send request
-    if (statusCode == HTTP_CODE_OK) {
-      Serial.println("Server responsed with HTTP status 200");
-    }
-    else {
+    if (statusCode != HTTP_CODE_OK) {
       Serial.printf("Got HTTP status: %d", statusCode);
-      return;
     }
     
     stringpayload = httpClient.getString();
@@ -45,10 +52,9 @@ void get_apidata(String &stringpayload) {
   httpClient.end();
 }
 
-
 void parse_json(String &unformatted, char* platform, char* departuretime) {
   // Variables to hold http response and JSON doc
-  DynamicJsonDocument json_data(4096);
+  DynamicJsonDocument json_data(8192);
   // Parse json data and extract departure time and platform number
   DeserializationError error = deserializeJson(json_data, unformatted);
 
@@ -83,6 +89,79 @@ void parse_json(String &unformatted, char* platform, char* departuretime) {
   strcpy(dest_station_full, json_data["filter"]["destination"]["name"]);
 }
 
+void parse_telegram(int numNewMessages) {
+  for (int i=0; i<numNewMessages; i++) {
+    String nchat_id = String(bot.messages[i].chat_id);
+    Serial.println(nchat_id);
+    if (nchat_id != SECRET_USERID) {
+      bot.sendMessage(nchat_id, "Unauthorized user", "");
+      continue;
+    }
+
+    // Get received message
+    char* text = (char*) bot.messages[i].text.c_str();
+
+    // Parse command
+    if (strcmp(text, "/next") == 0) {
+      // Send details of next train
+      bot.sendMessage(nchat_id, output_msg, "");
+      continue;
+    }
+
+    if (strncmp(text, "/depart", 7) == 0) {
+      // Update departure station
+      strlcpy(depart_station, text+8, 4);
+      // Confirm updated station
+      char confirm[46];
+      sprintf(confirm, "The departure station has been updated to %s", depart_station);
+      bot.sendMessage(nchat_id, confirm, "");
+      continue;
+    }
+
+    if (strncmp(text, "/arrive", 7) == 0) {
+      // Update arrival station
+      strlcpy(dest_station, text+8, 4);
+      // Confirm updated station
+      char confirm[46];
+      sprintf(confirm, "The arrival station has been updated to %s", dest_station);
+      bot.sendMessage(nchat_id, confirm, "");
+      continue;
+    }
+
+    if (strcmp(text, "/config") == 0) {
+      // Prepare information to be sent back to confirm setup
+      char config[128];
+      sprintf(config, "Looking at trains leaving %s and arriving in %s", depart_station_full, dest_station_full);
+      bot.sendMessage(nchat_id, config, "");
+      continue;
+    }
+
+    // If we have got to this point, command not set correctly so send help
+    char helpmsg[] = "Commands for StationRun are:\n\t/next\n\t/depart\n\t/arrive\n\t/config\n";
+    bot.sendMessage(nchat_id, helpmsg, "");
+  }
+}
+
+void update_tft() {
+  // Clear screen and set font size
+  tft.fillScreen(ST77XX_BLACK);
+  tft.setTextSize(2);
+
+  // Set cursor to correct position
+  tft.setCursor(0, 0);
+
+  // Update colour
+  tft.setTextColor(ST77XX_WHITE);
+  tft.setTextWrap(true);
+  char screen_msg1[64];
+  char screen_msg2[64];
+  sprintf(screen_msg1, "Next Train:\nFrom - %s\nTo - %s\nLeaves from\n\n", depart_station_full, dest_station_full);
+  sprintf(screen_msg2, "Platform %s\nat %s", platform, departure);
+  tft.print(screen_msg1);
+  tft.setTextSize(3);
+  tft.print(screen_msg2);
+}
+
 void Wifi_disconnected(WiFiEvent_t event, WiFiEventInfo_t info){
   Serial.print("WiFi lost connection. Reason: ");
   Serial.println(info.wifi_sta_disconnected.reason);
@@ -105,13 +184,25 @@ void setup() {
   }
   Serial.print(WiFi.localIP());
   Serial.print("\n");
+  client.setCACert(TELEGRAM_CERTIFICATE_ROOT);
+
+  // Setup TFT display - turn on backlite
+  pinMode(TFT_BACKLITE, OUTPUT);
+  digitalWrite(TFT_BACKLITE, HIGH);
+
+  // Turn on the TFT / I2C power supply
+  pinMode(TFT_I2C_POWER, OUTPUT);
+  digitalWrite(TFT_I2C_POWER, HIGH);
+  delay(10);
+
+  // Initialize TFT
+  tft.init(135, 240); // Init ST7789 240x135
+  tft.setRotation(3);
+  tft.fillScreen(ST77XX_BLACK);
+  tft.setTextSize(2);
 }
 
 void loop() {
-  // Define stations to depart from and arrive at.
-  char* dest_station = "YRK";
-  char* depart_station = "SHF";
-  
   // Find current time
   unsigned long currentMillis = millis();
 
@@ -119,6 +210,15 @@ void loop() {
   if (currentMillis - previousMillis >= interval) {
     // Update previous millis
     previousMillis = currentMillis;
+
+    // Check for new telegram messages
+    int numNewMessages = bot.getUpdates(bot.last_message_received + 1);
+
+    while(numNewMessages) {
+      Serial.println("Got Responses");
+      parse_telegram(numNewMessages);
+      numNewMessages = bot.getUpdates(bot.last_message_received + 1);
+    }
 
     // Format endpoint for Realtime Trains API
     sprintf(endpoint, "https://api.rtt.io/api/v1/json/search/%s/to/%s", depart_station, dest_station);
@@ -130,7 +230,8 @@ void loop() {
     // Get useful information from json data
     parse_json(payload, platform, departure);
 
+    // Print out message to serial port
     sprintf(output_msg, "The next train from %s to %s will leave at %s from platform %s", depart_station_full, dest_station_full, departure, platform);
-    Serial.println(output_msg);
+    update_tft();
   }
 }
