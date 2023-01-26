@@ -4,6 +4,7 @@
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 #include <Adafruit_ST7789.h>
+#include <Adafruit_GFX.h>
 #include <SPI.h>
 #include "configuration_secrets.h"
 
@@ -143,15 +144,14 @@ void parse_telegram(int numNewMessages) {
 }
 
 void update_tft() {
-  // Clear screen and set font size
-  tft.fillScreen(ST77XX_BLACK);
+  // Set font size
   tft.setTextSize(2);
 
   // Set cursor to correct position
   tft.setCursor(0, 0);
 
   // Update colour
-  tft.setTextColor(ST77XX_WHITE);
+  tft.setTextColor(ST77XX_WHITE, ST77XX_BLACK);
   tft.setTextWrap(true);
   char screen_msg1[64];
   char screen_msg2[64];
