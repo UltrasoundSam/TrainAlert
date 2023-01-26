@@ -93,7 +93,6 @@ void parse_json(String &unformatted, char* platform, char* departuretime) {
 void parse_telegram(int numNewMessages) {
   for (int i=0; i<numNewMessages; i++) {
     String nchat_id = String(bot.messages[i].chat_id);
-    Serial.println(nchat_id);
     if (nchat_id != SECRET_USERID) {
       bot.sendMessage(nchat_id, "Unauthorized user", "");
       continue;
@@ -116,6 +115,8 @@ void parse_telegram(int numNewMessages) {
       char confirm[46];
       sprintf(confirm, "The departure station has been updated to %s", depart_station);
       bot.sendMessage(nchat_id, confirm, "");
+      // Update screen
+      tft.fillScreen(ST77XX_BLACK);
       continue;
     }
 
@@ -126,6 +127,8 @@ void parse_telegram(int numNewMessages) {
       char confirm[46];
       sprintf(confirm, "The arrival station has been updated to %s", dest_station);
       bot.sendMessage(nchat_id, confirm, "");
+      // Update screen
+      tft.fillScreen(ST77XX_BLACK);
       continue;
     }
 
@@ -215,7 +218,6 @@ void loop() {
     int numNewMessages = bot.getUpdates(bot.last_message_received + 1);
 
     while(numNewMessages) {
-      Serial.println("Got Responses");
       parse_telegram(numNewMessages);
       numNewMessages = bot.getUpdates(bot.last_message_received + 1);
     }
