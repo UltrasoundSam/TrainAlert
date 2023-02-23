@@ -19,8 +19,9 @@ Adafruit_ST7789 tft = Adafruit_ST7789(TFT_CS, TFT_DC, TFT_RST);
 char endpoint[52];
 char departure[5]; 
 char platform[5];
-char depart_station_full[12];
-char dest_station_full[12];
+const byte name_length = 12;
+char depart_station_full[name_length];
+char dest_station_full[name_length];
 char output_msg[128];
 
 // Define stations to depart from and arrive at.
@@ -72,22 +73,22 @@ void parse_json(String &unformatted, char* platform, char* departuretime) {
 
   // Transfer platform data (if valid)
   if (plat_data) {
-    strcpy(platform, plat_data);
+    strlcpy(platform, plat_data, 5);
   }
   else {
-    strcpy(platform, "N/A");
+    strlcpy(platform, "N/A", 5);
   }
 
   // Transfer departure time (if valid)
   if (depart_time) {
-    strcpy(departuretime, depart_time);
+    strlcpy(departuretime, depart_time, 5);
   }
   else {
-    strcpy(departuretime, "None");
+    strlcpy(departuretime, "None", 5);
   }
   // Get useful information from json data
-  strcpy(depart_station_full, json_data["location"]["name"]);
-  strcpy(dest_station_full, json_data["filter"]["destination"]["name"]);
+  strlcpy(depart_station_full, json_data["location"]["name"], name_length);
+  strlcpy(dest_station_full, json_data["filter"]["destination"]["name"], name_length);
 }
 
 void parse_telegram(int numNewMessages) {
