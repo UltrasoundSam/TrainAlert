@@ -160,7 +160,7 @@ void update_tft() {
   char screen_msg1[64];
   char screen_msg2[64];
   sprintf(screen_msg1, "Next Train:\nFrom - %s\nTo - %s\nLeaves from\n\n", depart_station_full, dest_station_full);
-  sprintf(screen_msg2, "Platform %s\nat %s", platform, departure);
+  sprintf(screen_msg2, "Platform %s  \nat %s\n\n\n", platform, departure);
   tft.print(screen_msg1);
   tft.setTextSize(3);
   tft.print(screen_msg2);
