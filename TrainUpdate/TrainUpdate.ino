@@ -76,7 +76,7 @@ void parse_json(String &unformatted, char* platform, char* departuretime) {
     strlcpy(platform, plat_data, 5);
   }
   else {
-    strlcpy(platform, "N/A", 5);
+    strlcpy(platform, "NA", 5);
   }
 
   // Transfer departure time (if valid)
